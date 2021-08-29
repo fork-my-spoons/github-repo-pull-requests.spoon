@@ -21,7 +21,7 @@ local draft_icon = hs.styledtext.new(' ', { font = {name = 'feather', size = 
 local function show_warning(text)
     hs.notify.new(function() end, {
         autoWithdraw = false,
-        title = 'GitHub Contributions Spoon',
+        title = obj.name,
         informativeText = string.format(text)
     }):send()
 end
@@ -86,9 +86,57 @@ function obj:update_indicator(exitCode, stdout, stderr)
                     
                     local pulls = hs.json.read(os.getenv("HOME") .. "/.cache/github-pull-requests/" .. folder .. '/' .. file)
                     
-                    table.sort(pulls, function(left, right) return left.createdAt > right.createdAt end)
-                    local submenu = {}
+                    local my_pulls = {}
+                    local all_pulls = {}
+
                     for k, pull in pairs(pulls) do
+                        pull.toReview = false
+                        for k, req in pairs(pull.reviewRequests) do
+                            if req.login == 'streetturtle' then
+                                pull.toReview = true
+                            end
+                        end
+                        if pull.toReview then 
+                            table.insert(my_pulls, pull)
+                        else 
+                            table.insert(all_pulls, pull)
+                        end
+                    end
+
+                            
+                    table.sort(my_pulls, function(left, right) return left.createdAt > right.createdAt end)
+                    table.sort(all_pulls, function(left, right) return left.createdAt > right.createdAt end)
+                    
+                    local submenu = {}
+                    local header = false
+
+                    if #my_pulls > 0 then
+                        table.insert(submenu, { title = '-'})
+                        table.insert(submenu, { title = 'PRs to review', disabled = true})
+                        for k, pull in pairs(my_pulls) do
+
+
+                            local pull_title = hs.styledtext.new(pull.title .. '\n')
+                            .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))) .. '   ')
+                            .. user_icon .. subtitle(pull.author.login)
+
+                            if pull.isDraft == true then
+                                pull_title = draft_icon .. pull_title
+                            end
+
+                            table.insert(submenu, {
+                                title = pull_title,
+                                image = hs.image.imageFromURL('http://github.com/' .. pull.author.login .. '.png?size=36'):setSize({w=36,h=36}),
+                                fn = function() os.execute('open ' .. pull.url) end
+                            })
+                        end
+                    end
+
+                    table.insert(submenu, { title = '-'})
+                    table.insert(submenu, { title = 'All PRs', disabled = true})
+                    for k, pull in pairs(all_pulls) do
+
+
                         local pull_title = hs.styledtext.new(pull.title .. '\n')
                         .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))) .. '   ')
                         .. user_icon .. subtitle(pull.author.login)
@@ -120,12 +168,7 @@ end
 
 function obj:init()
     self.indicator = hs.menubar.new()
-end
-
-function obj:init()
-    self.indicator = hs.menubar.new()
     self.indicator:setIcon(hs.image.imageFromPath(self.iconPath .. '/git-pull-request.png'):setSize({w=16,h=16}), true)
-
 end
 
 function obj:setup(args)

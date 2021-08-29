@@ -10,5 +10,5 @@ for var in "$@"
 do
     dirname ~/.cache/github-pull-requests/$var | xargs mkdir -p 
     touch ~/.cache/github-pull-requests/$var
-    /usr/local/bin/gh pr list --repo $var  --limit 15 --json "title,author,url,createdAt,isDraft" > ~/.cache/github-pull-requests/$var
+    /usr/local/bin/gh pr list --repo $var  --limit 15 --json "title,author,url,createdAt,isDraft,reviewRequests" > ~/.cache/github-pull-requests/$var
 done
