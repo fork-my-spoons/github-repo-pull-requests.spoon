@@ -75,37 +75,44 @@ function obj:update_indicator(exitCode, stdout, stderr)
         print(stderr)
         return
     end
-
+    
+    local current_time = os.time(os.date("!*t"))
+    
     for folder in hs.fs.dir(os.getenv("HOME") .. "/.cache/github-pull-requests/") do
         if folder ~= '.' and folder ~= '..' then 
             
             for file in hs.fs.dir(os.getenv("HOME") .. "/.cache/github-pull-requests/" .. folder) do
                 if file ~= '.' and file ~= '..' then 
                     
-                    local current_time = os.time(os.date("!*t"))
-                    
                     local pulls = hs.json.read(os.getenv("HOME") .. "/.cache/github-pull-requests/" .. folder .. '/' .. file)
                     
                     local my_pulls = {}
                     local all_pulls = {}
+                    local draft_pulls = {}
 
                     for k, pull in pairs(pulls) do
-                        pull.toReview = false
-                        for k, req in pairs(pull.reviewRequests) do
-                            if req.login == 'streetturtle' then
-                                pull.toReview = true
+                        if pull.isDraft then
+                            table.insert(draft_pulls, pull)
+                        else        
+                            pull.toReview = false
+                            for k, req in pairs(pull.reviewRequests) do
+                                if req.login == 'streetturtle' then
+                                    pull.toReview = true
+                                end
                             end
-                        end
-                        if pull.toReview then 
-                            table.insert(my_pulls, pull)
-                        else 
-                            table.insert(all_pulls, pull)
+                            if pull.toReview then 
+                                table.insert(my_pulls, pull)
+                            else 
+                                table.insert(all_pulls, pull)
+                            end
                         end
                     end
 
+                    if self.hide_drafts == true then draft_pulls = {} end
                             
                     table.sort(my_pulls, function(left, right) return left.createdAt > right.createdAt end)
                     table.sort(all_pulls, function(left, right) return left.createdAt > right.createdAt end)
+                    table.sort(draft_pulls, function(left, right) return left.createdAt > right.createdAt end)
                     
                     local submenu = {}
                     local header = false
@@ -120,10 +127,6 @@ function obj:update_indicator(exitCode, stdout, stderr)
                             .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))) .. '   ')
                             .. user_icon .. subtitle(pull.author.login)
 
-                            if pull.isDraft == true then
-                                pull_title = draft_icon .. pull_title
-                            end
-
                             table.insert(submenu, {
                                 title = pull_title,
                                 image = hs.image.imageFromURL('http://github.com/' .. pull.author.login .. '.png?size=36'):setSize({w=36,h=36}),
@@ -136,14 +139,9 @@ function obj:update_indicator(exitCode, stdout, stderr)
                     table.insert(submenu, { title = 'All PRs', disabled = true})
                     for k, pull in pairs(all_pulls) do
 
-
                         local pull_title = hs.styledtext.new(pull.title .. '\n')
                         .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))) .. '   ')
                         .. user_icon .. subtitle(pull.author.login)
-
-                        if pull.isDraft == true then
-                            pull_title = draft_icon .. pull_title
-                        end
 
                         table.insert(submenu, {
                             title = pull_title,
@@ -152,6 +150,22 @@ function obj:update_indicator(exitCode, stdout, stderr)
                         })
                     end
 
+                    if #draft_pulls > 0 then
+                        table.insert(submenu, { title = '-'})
+                        table.insert(submenu, { title = 'Drafts', disabled = true})
+                        for k, pull in pairs(draft_pulls) do
+
+                            local pull_title = hs.styledtext.new(pull.title .. '\n')
+                            .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))) .. '   ')
+                            .. user_icon .. subtitle(pull.author.login)
+
+                            table.insert(submenu, {
+                                title = pull_title,
+                                image = hs.image.imageFromURL('http://github.com/' .. pull.author.login .. '.png?size=36'):setSize({w=36,h=36}),
+                                fn = function() os.execute('open ' .. pull.url) end
+                            })
+                        end
+                    end
                     table.insert(self.menu, {
                         title = file,
                         image = hs.image.imageFromURL('http://github.com/' .. folder .. '.png?size=36'):setSize({w=36,h=36}),
@@ -173,6 +187,7 @@ end
 
 function obj:setup(args)
     self.repos = args.repos
+    self.hide_drafts = args.hide_drafts or false
 end
 
 function obj:start()
