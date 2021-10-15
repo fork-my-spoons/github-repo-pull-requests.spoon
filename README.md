@@ -1,4 +1,8 @@
-# github-pull-requests
+# GitHub Repo Pull Requests
+
+A menu bar app, showing a list of pull requests for multiple repositories:
+
+![screenshot](./screenshots/screenshot.png)
 
 # Installation
 
@@ -10,23 +14,24 @@
 
       ```brew install hammerspoon --cask```
 
- - download [github-pull-requests.spoon](https://github.com/fork-my-spoons/github-pull-requests.spoon/releases/latest/download/github-pull-requests.spoon.zip), unzip and double click on a .spoon file. It will be installed under `~/.hammerspoon/Spoons` folder.
+ - download [github-repo-pull-requests.spoon](https://github.com/fork-my-spoons/github-repo-pull-requests.spoon/releases/latest/download/github-repo-pull-requests.spoon.zip), unzip and double click on a .spoon file. It will be installed under `~/.hammerspoon/Spoons` folder.
  
  - install `gh` - [GitHub CLI](https://cli.github.com/)
 
  - open ~/.hammerspoon/init.lua and add the following snippet, with your repositories:
 
 ```lua
--- github pull requests
-hs.loadSpoon("github-pull-requests")
-spoon['github-pull-requests']:setup({
-  repos = {'streetturtle/awesome-wm-widgets',
-    'Hammerspoon/hammerspoon',
-    'cli/cli'
+-- github repo pull requests
+hs.loadSpoon("github-repo-pull-requests")
+spoon['github-repo-pull-requests']:setup({
+  repos = {
+    'streetturtle/awesome-wm-widgets',
+    'hammerspoon/hammerspoon',
+    'flutter/flutter'
   }
 })
-spoon['github-pull-requests']:start()
+spoon['github-repo-pull-requests']:start()
 ```
 
 
-This app uses icons, to properly display them, install a [feather-font](https://github.com/AT-UI/feather-font) by [downloading](https://github.com/AT-UI/feather-font/raw/master/src/fonts/feather.ttf) this .ttf font and installing it.
+This app uses icons, to properly display them, install a [feather-font](https://github.com/AT-UI/feather-font) by [downloading](https://github.com/AT-UI/feather-font/raw/master/src/fonts/feather.ttf) the .ttf font and installing it.

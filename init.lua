@@ -2,7 +2,7 @@ local obj = {}
 obj.__index = obj
 
 -- Metadata
-obj.name = "GitHub Pull Requests"
+obj.name = "GitHub Repo Pull Requests"
 obj.version = "1.0"
 obj.author = "Pavel Makhov"
 obj.homepage = "https://github.com/fork-my-spoons/github-pull-requests.spoon"
@@ -15,6 +15,8 @@ obj.task = nil
 
 local calendar_icon = hs.styledtext.new(' ', { font = {name = 'feather', size = 12 }, color = {hex = '#8e8e8e'}})
 local user_icon = hs.styledtext.new(' ', { font = {name = 'feather', size = 12 }, color = {hex = '#8e8e8e'}})
+local branch_icon = hs.styledtext.new(' ', { font = {name = 'feather', size = 12 }, color = {hex = '#8e8e8e'}})
+local comment_icon = hs.styledtext.new(' ', { font = {name = 'feather', size = 12 }, color = {hex = '#8e8e8e'}})
 local draft_icon = hs.styledtext.new(' ', { font = {name = 'feather', size = 12 }, color = {hex = '#ffd60a'}})
 
 
@@ -59,13 +61,41 @@ local function subtitle(text)
     return hs.styledtext.new(text, {color = {hex = '#8e8e8e'}})
 end
 
-local function split(s, delimiter)
-    result = {};
-    for match in (s..delimiter):gmatch("(.-)"..delimiter) do
-        table.insert(result, match);
-    end
-    return result;
+local function create_menu_item_title(pull, current_time)
+    return hs.styledtext.new(pull.title .. '\n')
+        .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))))
+        .. hs.styledtext.new('   +' .. pull.additions, {color = {hex = '#A3BE8C'}}) .. hs.styledtext.new('   -' .. pull.deletions .. '   ', {color = {hex = '#BF616A'}}) 
+        .. user_icon .. subtitle(pull.author.login .. '\n')
+        .. branch_icon .. subtitle(pull.headRefName .. ' -> ' .. pull.baseRefName)
 end
+
+
+function obj:check_for_updates()
+    local release_url = 'https://api.github.com/repos/fork-my-spoons/github-repo-pull-requests.spoon/releases/latest'
+    hs.http.asyncGet(release_url, {}, function(status, body)
+        local latest_release = hs.json.decode(body)
+        latest = latest_release.tag_name:sub(2)
+        
+        if latest == self.version then
+            hs.notify.new(function() end, {
+                autoWithdraw = false,
+                title = self.name,
+                informativeText = "You have the latest version installed!"
+            }):send()
+        else
+            hs.notify.new(function() 
+                os.execute('open ' .. latest_release.assets[1].browser_download_url)
+            end, 
+            {
+                title = self.name,
+                informativeText = "New version is available",
+                actionButtonTitle = "Download",
+                hasActionButton = true
+            }):send()
+        end
+    end)
+end
+
 
 function obj:update_indicator(exitCode, stdout, stderr)
     self.menu = {}
@@ -122,29 +152,19 @@ function obj:update_indicator(exitCode, stdout, stderr)
                         table.insert(submenu, { title = 'PRs to review', disabled = true})
                         for k, pull in pairs(my_pulls) do
 
-
-                            local pull_title = hs.styledtext.new(pull.title .. '\n')
-                            .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))) .. '   ')
-                            .. user_icon .. subtitle(pull.author.login)
-
                             table.insert(submenu, {
-                                title = pull_title,
+                                title = create_menu_item_title(pull, current_time),
                                 image = hs.image.imageFromURL('http://github.com/' .. pull.author.login .. '.png?size=36'):setSize({w=36,h=36}),
                                 fn = function() os.execute('open ' .. pull.url) end
                             })
                         end
                     end
 
-                    table.insert(submenu, { title = '-'})
-                    table.insert(submenu, { title = 'All PRs', disabled = true})
+                    table.insert(submenu, {title = '-'})
+                    table.insert(submenu, {title = 'All PRs', disabled = true})
                     for k, pull in pairs(all_pulls) do
-
-                        local pull_title = hs.styledtext.new(pull.title .. '\n')
-                        .. calendar_icon .. subtitle(to_time_ago(os.difftime(current_time, parse_date(pull.createdAt))) .. '   ')
-                        .. user_icon .. subtitle(pull.author.login)
-
                         table.insert(submenu, {
-                            title = pull_title,
+                            title = create_menu_item_title(pull, current_time),
                             image = hs.image.imageFromURL('http://github.com/' .. pull.author.login .. '.png?size=36'):setSize({w=36,h=36}),
                             fn = function() os.execute('open ' .. pull.url) end
                         })
@@ -160,7 +180,7 @@ function obj:update_indicator(exitCode, stdout, stderr)
                             .. user_icon .. subtitle(pull.author.login)
 
                             table.insert(submenu, {
-                                title = pull_title,
+                                title = create_menu_item_title(pull, current_time),
                                 image = hs.image.imageFromURL('http://github.com/' .. pull.author.login .. '.png?size=36'):setSize({w=36,h=36}),
                                 fn = function() os.execute('open ' .. pull.url) end
                             })
@@ -171,13 +191,33 @@ function obj:update_indicator(exitCode, stdout, stderr)
                         image = hs.image.imageFromURL('http://github.com/' .. folder .. '.png?size=36'):setSize({w=36,h=36}),
                         menu = submenu
                     })
-
                 end
             end
         end
     end
 
+    table.insert(self.menu, {title = '-'})
+
+    table.insert(self.menu, { 
+        image = hs.image.imageFromName('NSRefreshTemplate'), 
+        title = 'Refresh', fn = function() self:refresh() end
+    })
+
+    table.insert(self.menu, { 
+        image = hs.image.imageFromName('NSTouchBarDownloadTemplate'), 
+        title = 'Check for updates', 
+        fn = function() self:check_for_updates() end
+    })
+    
     self.indicator:setMenu(self.menu)
+end
+
+function obj:refresh() 
+    hs.task.new('/bin/bash', function(exitCode, stdout, stderr) 
+        self:update_indicator(exitCode, stdout, stderr) 
+    end,
+    self.task_params)
+        :start()
 end
 
 function obj:init()
@@ -192,18 +232,16 @@ end
 
 function obj:start()
 
-    local task_params = {hs.spoons.resourcePath("get_pr.sh")}
-
+    self.task_params = {
+        hs.spoons.resourcePath("get_pull_requests.sh")
+    }
+    
     for _, v in pairs(self.repos) do
-        table.insert(task_params, v)
+        table.insert(self.task_params, v)
     end
 
-    hs.timer.new(600, function()
-
-    self.task = hs.task.new('/bin/bash',
-        function(exitCode, stdout, stderr) self:update_indicator(exitCode, stdout, stderr) end,
-        task_params):start()        
-    end):start():fire()
+    self.timer = hs.timer.new(600, function() self:refresh() end)
+    self.timer:start():fire()
 
 end
 
